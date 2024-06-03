@@ -1,6 +1,10 @@
+# vim: syntax=dockerfile expandtab tabstop=4 shiftwidth=4
 FROM nvcr.io/nvidia/pytorch:24.04-py3
 
 ENV MAX_JOBS=$(nproc)
+
+RUN apt-get update && apt-get upgrade -y && \
+    rm -rf /var/lib/apt/lists/*
 
 RUN --mount=type=cache,id=pipcache,dst=/root/.cache/pip,mode=0777,Z \
     git clone https://github.com/pytorch/audio.git && \

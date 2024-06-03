@@ -1,4 +1,5 @@
-FROM quay.io/fabiendupont/pytorch:ubi9-pypi
+# vim: syntax=dockerfile expandtab tabstop=4 shiftwidth=4
+FROM quay.io/fabiendupont/pytorch:2.3.0-ubi9-pypi
 
 ARG PYTHON_VERSION=3.11
 ENV PYTHON_VERSION=3.11
