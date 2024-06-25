@@ -1,5 +1,5 @@
 # vim: syntax=dockerfile expandtab tabstop=4 shiftwidth=4
-FROM quay.io/fabiendupont/pytorch-devel:nvidia-24.04-py3-ubi9
+FROM quay.io/fabiendupont/pytorch-devel:nvidia-24.04-py3-ubi9-split
 
 ARG PYTHON_VERSION=3.11
 ENV PYTHON=python${PYTHON_VERSION}
@@ -66,8 +66,6 @@ RUN --mount=type=cache,id=cache,dst=/root/.cache,mode=0777,Z \
 RUN --mount=type=cache,id=cache,dst=/root/.cache,mode=0777,Z \
     source ${VIRTUAL_ENV}/bin/activate && \
     python -m pip install /workspace/vllm/dist/*.whl
-
-
 
 RUN --mount=type=cache,id=cache,dst=/root/.cache,mode=0777,Z \
     git clone --depth=1 -b ${VLLM_TGIS_ADAPTER_VERSION} https://github.com/dtrifiro/vllm-tgis-adapter.git && \
