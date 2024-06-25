@@ -382,7 +382,7 @@ RUN --mount=type=cache,id=cache,dst=/root/.cache,mode=0777,Z \
 #    cd apex && \
 #    python setup.py bdist_wheel --cpp_ext --cuda_ext --cudnn_gbn --nccl_p2p
 
-FROM quay.io/fabiendupont/pytorch-devel-builder:nvidia-${NVIDIA_SOURCE_IMAGE_TAG}-ubi${RHEL_MAJOR_VERSION}
+FROM quay.io/fabiendupont/pytorch-runtime-builder:nvidia-${NVIDIA_SOURCE_IMAGE_TAG}-ubi${RHEL_MAJOR_VERSION}
 
 ARG CUDA_VERSION=12.4.1
 ARG CUDA_DASHED_VERSION=12-4
