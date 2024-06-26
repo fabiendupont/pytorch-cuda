@@ -91,6 +91,7 @@ RUN microdnf update -y --nodocs && \
         pango \
         pango \
         ${PYTHON} \
+        ${PYTHON}-devel \
         ${PYTHON}-pip \
         readline \
         sudo \
@@ -102,7 +103,8 @@ RUN microdnf update -y --nodocs && \
         which \
     && \
     microdnf clean all && \
-    ${PYTHON} -m venv ${VIRTUAL_ENV}
+    ${PYTHON} -m venv ${VIRTUAL_ENV} && \
+    cp -r /usr/include/${PYTHON}/* ${VIRTUAL_ENV}/include/${PYTHON}
 
 RUN microdnf install -y --nodocs --enablerepo=codeready-builder-for-rhel-9-x86_64-rpms \
         gdbm \
@@ -192,7 +194,7 @@ RUN rpm --import /etc/pki/rpm-gpg/RPM-GPG-KEY-NVIDIA-CUDA-9 && \
         libnvonnxparsers10 \
     && \
     microdnf clean all && \
-    ln -s lubcuda.so.1 /usr/lib64/libcuda.so
+    ln -s /usr/lib64/libcuda.so.1 /usr/lib64/libcuda.so
 
 ENV _CUDA_COMPAT_PATH=/usr/local/cuda/compat
 ENV CUDA_CACHE_DISABLE=1

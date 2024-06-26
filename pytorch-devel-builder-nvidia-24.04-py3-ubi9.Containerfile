@@ -182,7 +182,7 @@ RUN rpm --import /etc/pki/rpm-gpg/RPM-GPG-KEY-NVIDIA-CUDA-9 && \
         tensorrt-devel \
     && \
     microdnf clean all && \
-    ln -s lubcuda.so.1 /usr/lib64/libcuda.so
+    ln -s /usr/lib64/libcuda.so.1 /usr/lib64/libcuda.so
 
 ENV _CUDA_COMPAT_PATH=/usr/local/cuda/compat
 ENV CUDA_CACHE_DISABLE=1

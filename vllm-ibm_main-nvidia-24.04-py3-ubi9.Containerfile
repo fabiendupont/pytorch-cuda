@@ -1,5 +1,5 @@
 # vim: syntax=dockerfile expandtab tabstop=4 shiftwidth=4
-FROM quay.io/fabiendupont/pytorch-devel:nvidia-24.04-py3-ubi9-split
+FROM quay.io/fabiendupont/pytorch-devel:nvidia-24.04-py3-ubi9 AS builder
 
 ARG PYTHON_VERSION=3.11
 ENV PYTHON=python${PYTHON_VERSION}
@@ -11,7 +11,7 @@ ENV PATH="${VIRTUAL_ENV}/bin:$PATH"
 ARG XFORMERS_VERSION=0.0.26.post1
 #ARG VLLM_VERSION=0.5.0.post1
 ARG VLLM_VERSION=main
-ARG VLLM_FLASH_ATTN_VERSION=2.5.9
+ARG VLLM_FLASH_ATTN_VERSION=2.5.8.post2
 ARG VLLM_TGIS_ADAPTER_VERSION=0.0.4
 
 RUN --mount=type=cache,id=cache,dst=/root/.cache,mode=0777,Z \
@@ -34,6 +34,21 @@ RUN --mount=type=cache,id=cache,dst=/root/.cache,mode=0777,Z \
     source ${VIRTUAL_ENV}/bin/activate && \
     python -m pip install /workspace/xformers/dist/*.whl
 
+RUN --mount=type=cache,id=cache,dst=/root/.cache,mode=0777,Z \
+    git clone --depth=1 -b v${VLLM_FLASH_ATTN_VERSION} https://github.com/vllm-project/flash-attention.git && \
+    cd flash-attention && \
+    git submodule sync && \
+    git submodule update --init --recursive
+
+RUN --mount=type=cache,id=cache,dst=/root/.cache,mode=0777,Z \
+    source ${VIRTUAL_ENV}/bin/activate && \
+    cd flash-attention && \
+    MAX_JOBS=$(nproc) NVCC_THREADS=$(nproc) CAFFE2_USE_CUDNN=1 USE_CUDNN=1 python setup.py bdist_wheel
+
+RUN --mount=type=cache,id=cache,dst=/root/.cache,mode=0777,Z \
+    source ${VIRTUAL_ENV}/bin/activate && \
+    python -m pip install /workspace/flash-attention/dist/*.whl
+
 #    git clone --depth=1 -b v${VLLM_VERSION} https://github.com/vllm-project/vllm.git && \
 RUN --mount=type=cache,id=cache,dst=/root/.cache,mode=0777,Z \
     git clone --depth=1 -b ${VLLM_VERSION} https://github.com/opendatahub-io/vllm.git && \
@@ -46,22 +61,7 @@ ENV VLLM_INSTALL_PUNICA_KERNELS=1
 RUN --mount=type=cache,id=cache,dst=/root/.cache,mode=0777,Z \
     source ${VIRTUAL_ENV}/bin/activate && \
     cd /workspace/vllm && \
-    MAX_JOBS=$(nproc) NVCC_THREADS=$(nproc) CMAKE_BUILD_TYPE=Release CAFFE2_USE_CUDNN=1 USE_CUDNN=1 python setup.py bdist_wheel
-
-RUN --mount=type=cache,id=cache,dst=/root/.cache,mode=0777,Z \
-    source ${VIRTUAL_ENV}/bin/activate && \
-    python -m pip install /workspace/vllm/dist/*.whl
-
-RUN --mount=type=cache,id=cache,dst=/root/.cache,mode=0777,Z \
-    git clone --depth=1 -b v${VLLM_FLASH_ATTN_VERSION} https://github.com/vllm-project/flash-attention.git && \
-    cd vllm && \
-    git submodule sync && \
-    git submodule update --init --recursive
-
-RUN --mount=type=cache,id=cache,dst=/root/.cache,mode=0777,Z \
-    source ${VIRTUAL_ENV}/bin/activate && \
-    cd vllm && \
-    MAX_JOBS=$(nproc) NVCC_THREADS=$(nproc) CAFFE2_USE_CUDNN=1 USE_CUDNN=1 python setup.py bdist_wheel
+    MAX_JOBS=$(nproc) NVCC_THREADS=$(nproc) CMAKE_BUILD_TYPE=Release USE_CUDNN=1 python setup.py bdist_wheel
 
 RUN --mount=type=cache,id=cache,dst=/root/.cache,mode=0777,Z \
     source ${VIRTUAL_ENV}/bin/activate && \
@@ -82,6 +82,31 @@ RUN --mount=type=cache,id=cache,dst=/root/.cache,mode=0777,Z \
 RUN --mount=type=cache,id=cache,dst=/root/.cache,mode=0777,Z \
     source ${VIRTUAL_ENV}/bin/activate && \
     python -m pip install /workspace/vllm-tgis-adapter/dist/*.whl
+
+#
+# Install VLLM and its dependencies on top of PyTorch runtime
+#
+
+FROM quay.io/fabiendupont/pytorch-runtime:nvidia-24.04-py3-ubi9
+
+ENV XFORMERS_VERSION=0.0.26.post1
+#ARG VLLM_VERSION=0.5.0.post1
+ENV VLLM_VERSION=main
+ENV VLLM_FLASH_ATTN_VERSION=2.5.8.post2
+ENV VLLM_TGIS_ADAPTER_VERSION=0.0.4
+
+RUN --mount=type=cache,id=cache,dst=/root/.cache,mode=0777,Z \
+    source ${VIRTUAL_ENV}/bin/activate && \
+    python -m pip install packaging grpcio-tools mypy_protobuf
+
+COPY --from=builder /workspace/xformers/dist/*.whl /tmp/wheels/
+COPY --from=builder /workspace/flash-attention/dist/*.whl /tmp/wheels/
+COPY --from=builder /workspace/vllm/dist/*.whl /tmp/wheels/
+COPY --from=builder /workspace/vllm-tgis-adapter/dist/*.whl /tmp/wheels/
+
+RUN --mount=type=cache,id=cache,dst=/root/.cache,mode=0777,Z \
+    source ${VIRTUAL_ENV}/bin/activate && \
+    python -m pip install /tmp/wheels/*.whl
 
 WORKDIR /instructlab
 
