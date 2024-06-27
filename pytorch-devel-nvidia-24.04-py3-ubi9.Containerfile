@@ -12,6 +12,56 @@ FROM ${NVIDIA_SOURCE_IMAGE_REPOSITORY}/${NVIDIA_SOURCE_IMAGE_NAME}:${NVIDIA_SOUR
 
 FROM quay.io/fabiendupont/pytorch-devel-builder:nvidia-${NVIDIA_SOURCE_IMAGE_TAG}-ubi${RHEL_MAJOR_VERSION} AS builder
 
+ENV PYTORCH_VERSION=2.3.0
+ENV PYTORCH_AUDIO_VERSION=2.3.0
+ENV PYTORCH_DATA_VERSION=0.7.1
+ENV PYTORCH_TENSORRT_VERSION=2.3.0
+ENV PYTORCH_TEXT_VERSION=0.18.0
+ENV PYTORCH_VISION_VERSION=0.18.1
+
+ENV PYTORCH_BUILD_VERSION=${PYTORCH_VERSION}
+ENV PYTORCH_BUILD_NUMBER=0
+
+ENV TRITON_VERSION=2.3.0
+ENV TRANSFORMER_ENGINE_VERSION=1.7
+ENV COCOAPI_VERSION=2.0.8
+ENV DALI_VERSION=1.36.0
+#ENV GDRCOPY_VERSION=
+#ENV NVFUSER_VERSION=0.1.6
+#ENV POLYGRAPHY_VERSION=
+
+ENV PROTOCOL_BUFFERS_PYTHON_IMPLEMENTATION=python
+
+ENV NVIDIA_PRODUCT_NAME=PyTorch
+# Taints the wheel version
+#ENV NVIDIA_PYTORCH_VERSION=24.04
+
+ENV TORCH_CUDA_ARCH_LIST="5.2 6.0 6.1 7.0 7.2 7.5 8.0 8.6 8.7 9.0+PTX"
+ENV TORCH_ALLOW_TF32_CUBLAS_OVERRIDE=1
+ENV TORCH_CUDNN_V8_API_ENABLED=1
+
+# FIXME: Build these wheels in the pipeline. Do not require CUDA.
+RUN --mount=type=cache,id=cache,dst=/root/.cache,mode=0777,Z \
+    source ${VIRTUAL_ENV}/bin/activate && \
+    python -m pip install --no-deps \
+        "numpy<2.0.0" packaging pyyaml typing_extensions
+
+# FIXME: Build these wheels in the pipeline. Require CUDA.
+RUN --mount=type=cache,id=cache,dst=/root/.cache,mode=0777,Z \
+    source ${VIRTUAL_ENV}/bin/activate && \
+    python -m pip install "triton==${TRITON_VERSION}" \
+        "nvidia-dali-cuda120==${DALI_VERSION}" \
+        "pycocotools==${COCOAPI_VERSION}"
+
+# --- Install NVIDIA HPC-X --- #
+COPY --from=source /opt/hpcx /opt/hpcx
+
+ENV PATH="/opt/hpcx/clusterkit/bin:/opt/hpcx/hcoll/bin:/opt/hpcx/ompi/bin:/opt/hpcx/sharp/bin:/opt/hpcx/sharp/sbin:/opt/hpcx/ucc/bin:/opt/hpcx/ucx/bin:${PATH}"
+ENV LD_LIBRARY_PATH="/opt/hpcx/clusterkit/lib:/opt/hpcx/hcoll/lib:/opt/hpcx/nccl_rdma_sharp_plugin/lib:/opt/hpcx/ompi/lib:/opt/hpcx/sharp/lib:/opt/hpcx/ucc/lib:/opt/hpcx/ucx/lib:${LD_LIBRARY_PATH}"
+ENV OMPI_MCA_coll_hcoll_enable=0
+ENV OPAL_PREFIX="/opt/hpcx/ompi"
+ENV UCC_CL_BASIC_TLS="^sharp"
+
 COPY --from=source /opt/pytorch /opt/pytorch
 
 WORKDIR /opt/pytorch
@@ -388,6 +438,47 @@ ARG CUDA_VERSION=12.4.1
 ARG CUDA_DASHED_VERSION=12-4
 ARG CUDA_MAJOR_VERSION=12
 ARG CUDNN_MAJOR_VERSION=9
+
+ENV PYTORCH_VERSION=2.3.0
+ENV PYTORCH_AUDIO_VERSION=2.3.0
+ENV PYTORCH_DATA_VERSION=0.7.1
+ENV PYTORCH_TENSORRT_VERSION=2.3.0
+ENV PYTORCH_TEXT_VERSION=0.18.0
+ENV PYTORCH_VISION_VERSION=0.18.1
+
+ENV PYTORCH_BUILD_VERSION=${PYTORCH_VERSION}
+ENV PYTORCH_BUILD_NUMBER=0
+
+ENV TRITON_VERSION=2.3.0
+ENV TRANSFORMER_ENGINE_VERSION=1.7
+ENV COCOAPI_VERSION=2.0.8
+ENV DALI_VERSION=1.36.0
+#ENV GDRCOPY_VERSION=
+#ENV NVFUSER_VERSION=0.1.6
+#ENV POLYGRAPHY_VERSION=
+
+ENV PROTOCOL_BUFFERS_PYTHON_IMPLEMENTATION=python
+
+ENV NVIDIA_PRODUCT_NAME=PyTorch
+# Taints the wheel version
+#ENV NVIDIA_PYTORCH_VERSION=24.04
+
+ENV TORCH_CUDA_ARCH_LIST="5.2 6.0 6.1 7.0 7.2 7.5 8.0 8.6 8.7 9.0+PTX"
+ENV TORCH_ALLOW_TF32_CUBLAS_OVERRIDE=1
+ENV TORCH_CUDNN_V8_API_ENABLED=1
+
+# FIXME: Build these wheels in the pipeline. Do not require CUDA.
+RUN --mount=type=cache,id=cache,dst=/root/.cache,mode=0777,Z \
+    source ${VIRTUAL_ENV}/bin/activate && \
+    python -m pip install --no-deps \
+        "numpy<2.0.0" packaging pyyaml typing_extensions
+
+# FIXME: Build these wheels in the pipeline. Require CUDA.
+RUN --mount=type=cache,id=cache,dst=/root/.cache,mode=0777,Z \
+    source ${VIRTUAL_ENV}/bin/activate && \
+    python -m pip install "triton==${TRITON_VERSION}" \
+        "nvidia-dali-cuda120==${DALI_VERSION}" \
+        "pycocotools==${COCOAPI_VERSION}"
 
 COPY --from=source /opt/hpcx /opt/hpcx
 

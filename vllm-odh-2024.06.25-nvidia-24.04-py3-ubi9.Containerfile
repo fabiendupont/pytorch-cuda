@@ -7,10 +7,8 @@ ARG PIP_DISABLE_PIP_VERSION_CHECK=1
 
 ENV PATH="${VIRTUAL_ENV}/bin:$PATH"
 
-#ARG TRITON_VERSION=2.1.0
 ARG XFORMERS_VERSION=0.0.26.post1
-#ARG VLLM_VERSION=0.5.0.post1
-ARG VLLM_VERSION=main
+ARG VLLM_VERSION=2024.06.25
 ARG VLLM_FLASH_ATTN_VERSION=2.5.8.post2
 ARG VLLM_TGIS_ADAPTER_VERSION=0.0.4
 
@@ -49,7 +47,6 @@ RUN --mount=type=cache,id=cache,dst=/root/.cache,mode=0777,Z \
     source ${VIRTUAL_ENV}/bin/activate && \
     python -m pip install /workspace/flash-attention/dist/*.whl
 
-#    git clone --depth=1 -b v${VLLM_VERSION} https://github.com/vllm-project/vllm.git && \
 RUN --mount=type=cache,id=cache,dst=/root/.cache,mode=0777,Z \
     git clone --depth=1 -b ${VLLM_VERSION} https://github.com/opendatahub-io/vllm.git && \
     cd vllm && \
@@ -61,7 +58,7 @@ ENV VLLM_INSTALL_PUNICA_KERNELS=1
 RUN --mount=type=cache,id=cache,dst=/root/.cache,mode=0777,Z \
     source ${VIRTUAL_ENV}/bin/activate && \
     cd /workspace/vllm && \
-    MAX_JOBS=$(nproc) NVCC_THREADS=$(nproc) CMAKE_BUILD_TYPE=Release USE_CUDNN=1 python setup.py bdist_wheel
+    MAX_JOBS=$(nproc) NVCC_THREADS=$(nproc) CMAKE_BUILD_TYPE=Release USE_CUDNN=1 CUDA_SELECT_NVCC_ARCH_FLAGS=${TORCH_CUDA_ARCH_LIST} python setup.py bdist_wheel
 
 RUN --mount=type=cache,id=cache,dst=/root/.cache,mode=0777,Z \
     source ${VIRTUAL_ENV}/bin/activate && \
@@ -90,9 +87,8 @@ RUN --mount=type=cache,id=cache,dst=/root/.cache,mode=0777,Z \
 FROM quay.io/fabiendupont/pytorch-runtime:nvidia-24.04-py3-ubi9
 
 ENV XFORMERS_VERSION=0.0.26.post1
-#ARG VLLM_VERSION=0.5.0.post1
-ENV VLLM_VERSION=main
-ENV VLLM_FLASH_ATTN_VERSION=2.5.8.post2
+ENV VLLM_VERSION=0.5.0.post1
+ENV VLLM_FLASH_ATTN_VERSION=2.5.9
 ENV VLLM_TGIS_ADAPTER_VERSION=0.0.4
 
 RUN --mount=type=cache,id=cache,dst=/root/.cache,mode=0777,Z \
@@ -104,12 +100,24 @@ COPY --from=builder /workspace/flash-attention/dist/*.whl /tmp/wheels/
 COPY --from=builder /workspace/vllm/dist/*.whl /tmp/wheels/
 COPY --from=builder /workspace/vllm-tgis-adapter/dist/*.whl /tmp/wheels/
 
+# Custom cache manager (fix for https://issues.redhat.com/browse/RHOAIENG-8043)
+COPY --from=builder /workspace/vllm/extras/custom_cache_manager.py ${VIRTUAL_ENV}/lib/${PYTHON}/site-packages/custom_cache_manager.py
+COPY --from=builder /workspace/vllm/LICENSE /licenses/vllm.md
+
 RUN --mount=type=cache,id=cache,dst=/root/.cache,mode=0777,Z \
     source ${VIRTUAL_ENV}/bin/activate && \
     python -m pip install /tmp/wheels/*.whl
 
 WORKDIR /instructlab
 
-ENV GRPC_PORT=8033
+ENV HF_HUB_OFFLINE=1
+ENV PORT=8080
+ENV HOME=/instructlab
+ENV VLLM_USAGE_SOURCE=production-docker-image
+ENV VLLM_WORKER_MULTIPROC_METHOD=fork
+ENV TRITON_CACHE_MANAGER="custom_cache_manager:CustomCacheManager"
+
+#ENV GRPC_PORT=8033
 USER 2000
-ENTRYPOINT ["/opt/python3.11/venv/bin/python", "-m", "vllm_tgis_adapter", "--distributed-executor-backend=mp"]
+ENTRYPOINT ["/opt/python3.11/venv/bin/python3", "-m", "vllm.entrypoints.openai.api_server", "--distributed-executor-backend=mp"]
+#ENTRYPOINT ["/opt/python3.11/venv/bin/python", "-m", "vllm_tgis_adapter", "--distributed-executor-backend=mp"]
